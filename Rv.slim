@@ -6,16 +6,14 @@
 // set up a simple neutral nonWF simulation
 initialize() {
 	initializeSLiMModelType("nonWF");
-	defineConstant("K", 100);	// carrying capacity
-	// defineConstant("E", 0.8) //community evenness
-	// defineConstant("R", 0.1) // proportion of reservoir species
-	//defineConstant("L", c(0.7, 0.0, 0.0, 0.0, 0.25, 0.5, 0.75, 1.0)); // life table for age-based mortality
+	defineConstant("K", 30);	// carrying capacity
+	defineConstant("L", c(0.7, 0.0, 0.0, 0.0, 0.25, 0.5, 0.75, 1.0)); // life table for age-based mortality
 	
 	// neutral mutations, which are allowed to fix
 	initializeMutationType("m1", 0.5, "f", 0.0);
 	m1.convertToSubstitution = T;
 	// beneficial mutations, which are allowed to fix
-	initializeMutationType("m2", 0.5, "e", 0.1);
+	initializeMutationType("m2", 0.5, "n", 0.1, 0.05);
 	m1.convertToSubstitution = F;
 	
 	initializeGenomicElementType("g1", m1, 1.0);
@@ -29,17 +27,24 @@ initialize() {
 	initializeRecombinationRate(1e-8);
 }
 
-// each individual reproduces itself once
+// each individual reproduces once, and must be at least 3 ticks old
 reproduction() {
-	subpop.addCrossed(individual, subpop.sampleIndividuals(1));
+	if (individual.age > 2) {
+		mate = subpop.sampleIndividuals(1, minAge=3);
+		subpop.addCrossed(individual, mate);
+	}
 }
 
-// create an initial population of 10 individuals
+// create an initial population of 10 individuals with multiple ages
 1 early() {
 	sim.addSubpop("p1", 10);
-	sim.addSubpop("p2", 10);
-	sim.addSubpop("p3", 10);
+	p1.individuals.age = rdunif(10, min=0, max=7);
+	//sim.addSubpop("p2", 10);
+	//p2.individuals.age = rdunif(10, min=0, max=7);
+	//sim.addSubpop("p3", 10);
+	//p3.individuals.age = rdunif(10, min=0, max=7);
 }
+
 
 // let beneficial mutations arise in offspring
 100 early() {
@@ -49,9 +54,29 @@ reproduction() {
 
 // provide density-dependent selection
 early() {
-	p1.fitnessScaling = K / p1.individualCount;
-	p2.fitnessScaling = K / p2.individualCount;
-	p3.fitnessScaling = K / p3.individualCount;
+	// life table based individual mortality (note: make this into a loop)
+	inds1 = p1.individuals;
+	ages1 = inds1.age;
+	mortality1 = L[ages1];
+	survival1 = 1 - mortality1;
+	inds1.fitnessScaling = survival1;
+	
+	//inds2 = p2.individuals;
+	//ages2 = inds2.age;
+	//mortality2 = L[ages2];
+	//survival2 = 1 - mortality2;
+	//inds2.fitnessScaling = survival2;
+	
+	//inds3 = p3.individuals;
+	//ages3 = inds3.age;
+	//mortality3 = L[ages3];
+//	survival3 = 1 - mortality3;
+//	inds3.fitnessScaling = survival3;
+	
+	// density-dependence, factoring in individual mortality
+	p1.fitnessScaling = K / (p1.individualCount * mean(survival1));
+//	p2.fitnessScaling = K / (p2.individualCount * mean(survival2));
+//	p3.fitnessScaling = K / (p3.individualCount * mean(survival3));
 }
 
 // output all fixed mutations at end
